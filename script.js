@@ -73,6 +73,9 @@ function startNewGame() {
     
     // Atualizar a lista de palavras para encontrar
     updateWordList();
+    
+    // Atualizar contador de palavras encontradas
+    updateFoundCounter();
 }
 
 // Seleciona palavras aleatórias para o jogo
@@ -243,6 +246,23 @@ function renderGrid() {
         oldButtonContainer.remove();
     }
     
+    // Remover status de jogo se existir
+    const oldGameStatus = document.querySelector('.game-status');
+    if (oldGameStatus) {
+        oldGameStatus.remove();
+    }
+    
+    // Verificar se estamos em um dispositivo móvel
+    const isMobile = window.innerWidth <= 768;
+    
+    // Ajustar o tamanho das células baseado no tamanho da tela
+    const cellSize = isMobile ? 35 : 40;
+    
+    // Se for dispositivo móvel, reorganizar a interface
+    if (isMobile) {
+        reorganizeMobileInterface();
+    }
+    
     // Criar células do grid
     for (let row = 0; row < gridSize; row++) {
         for (let col = 0; col < gridSize; col++) {
@@ -252,28 +272,56 @@ function renderGrid() {
             cell.dataset.row = row;
             cell.dataset.col = col;
             
-            // Simplificar para usar apenas clique em vez de arrastar
+            // Adicionar eventos
             cell.addEventListener('click', handleCellClick);
+            cell.addEventListener('touchstart', function(e) {
+                // Prevenir zoom em dispositivos móveis
+                e.preventDefault();
+            }, { passive: false });
             
             gameGrid.appendChild(cell);
         }
     }
     
+    // Informar o usuário sobre como jogar (especialmente para novos usuários)
+    if (!localStorage.getItem('cacaPalavrasInstructionShown')) {
+        const instruction = document.createElement('div');
+        instruction.className = 'instruction';
+        instruction.innerHTML = '<p>Clique nas letras para formar as palavras e depois confirme!</p>';
+        instruction.style.textAlign = 'center';
+        instruction.style.padding = '10px';
+        instruction.style.backgroundColor = '#f9f9f9';
+        instruction.style.marginBottom = '15px';
+        instruction.style.borderRadius = '5px';
+        
+        // Inserir instruções antes do grid
+        gameGrid.parentNode.insertBefore(instruction, gameGrid);
+        
+        // Marcar que as instruções foram exibidas
+        localStorage.setItem('cacaPalavrasInstructionShown', 'true');
+        
+        // Remover após 5 segundos
+        setTimeout(() => {
+            instruction.style.opacity = '0';
+            instruction.style.transition = 'opacity 0.5s';
+            setTimeout(() => instruction.remove(), 500);
+        }, 5000);
+    }
+    
     // Botão para confirmar a seleção
     const confirmButton = document.createElement('button');
-    confirmButton.textContent = 'Confirmar Palavra';
+    confirmButton.textContent = 'Confirmar';
     confirmButton.id = 'confirmButton';
     confirmButton.addEventListener('click', checkSelectedWord);
     
     // Botão para limpar a seleção
     const clearButton = document.createElement('button');
-    clearButton.textContent = 'Limpar Seleção';
+    clearButton.textContent = 'Limpar';
     clearButton.id = 'clearButton';
     clearButton.addEventListener('click', () => {
         clearSelection();
         messageEl.textContent = '';
     });
-    clearButton.style.backgroundColor = '#f44336';
     
     // Adicionar botões
     const buttonContainer = document.createElement('div');
@@ -283,6 +331,9 @@ function renderGrid() {
     
     // Adicionar container de botões após o grid
     gameGrid.parentNode.appendChild(buttonContainer);
+    
+    // Rolagem suave para o início ao iniciar novo jogo
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 // Atualiza a lista de palavras para encontrar
@@ -299,6 +350,130 @@ function updateWordList() {
         }
         
         wordsToFind.appendChild(li);
+    }
+    
+    // Atualizar contador de palavras encontradas
+    updateFoundCounter();
+}
+
+// Atualiza o contador de palavras encontradas
+function updateFoundCounter() {
+    const isMobile = window.innerWidth <= 768;
+    
+    if (isMobile) {
+        // Criar ou atualizar o status do jogo
+        let gameStatus = document.querySelector('.game-status');
+        
+        if (!gameStatus) {
+            gameStatus = document.createElement('div');
+            gameStatus.className = 'game-status';
+            document.querySelector('.container').appendChild(gameStatus);
+        }
+        
+        gameStatus.innerHTML = `<span class="found-counter">${foundWords.length}</span>/${currentWords.length}`;
+    }
+}
+
+// Reorganiza a interface para dispositivos móveis
+function reorganizeMobileInterface() {
+    const container = document.querySelector('.container');
+    const gameContainer = document.querySelector('.game-container');
+    const wordList = document.querySelector('.word-list');
+    
+    // Converter a seção de palavras para um toggle
+    if (!document.querySelector('.words-toggle')) {
+        // Remover a lista de palavras do seu local atual
+        gameContainer.removeChild(wordList);
+        
+        // Criar a seção de toggle para as palavras
+        const wordsToggle = document.createElement('div');
+        wordsToggle.className = 'toggle-section words-toggle';
+        
+        // Criar o cabeçalho do toggle
+        const toggleHeader = document.createElement('div');
+        toggleHeader.className = 'toggle-header';
+        toggleHeader.innerHTML = `
+            <h3>Palavras para encontrar (${currentWords.length})</h3>
+            <span class="toggle-indicator">▼</span>
+        `;
+        
+        // Criar o conteúdo do toggle
+        const toggleContent = document.createElement('div');
+        toggleContent.className = 'toggle-content';
+        toggleContent.appendChild(wordList);
+        
+        // Montar a estrutura
+        wordsToggle.appendChild(toggleHeader);
+        wordsToggle.appendChild(toggleContent);
+        
+        // Inserir o toggle antes do container do jogo
+        container.insertBefore(wordsToggle, gameContainer);
+        
+        // Adicionar texto explícito de Ver mais/Ver menos
+        const toggleText = document.createElement('span');
+        toggleText.className = 'toggle-text';
+        toggleText.textContent = 'Ver mais';
+        toggleHeader.appendChild(toggleText);
+        
+        // Adicionar evento de toggle
+        toggleHeader.addEventListener('click', () => {
+            wordsToggle.classList.toggle('expanded');
+            // Atualizar texto do botão
+            if (wordsToggle.classList.contains('expanded')) {
+                toggleText.textContent = 'Ver menos';
+            } else {
+                toggleText.textContent = 'Ver mais';
+            }
+        });
+    }
+    
+    // Converter opções do jogo para um toggle se ainda não existir
+    if (!document.querySelector('.options-toggle')) {
+        const gameOptions = document.querySelector('.game-options');
+        
+        // Remover opções do seu local atual
+        container.removeChild(gameOptions);
+        
+        // Criar a seção de toggle para as opções
+        const optionsToggle = document.createElement('div');
+        optionsToggle.className = 'toggle-section options-toggle';
+        
+        // Criar o cabeçalho do toggle
+        const toggleHeader = document.createElement('div');
+        toggleHeader.className = 'toggle-header';
+        toggleHeader.innerHTML = `
+            <h3>Opções do Jogo</h3>
+            <span class="toggle-indicator">▼</span>
+        `;
+        
+        // Adicionar texto explícito de Ver mais/Ver menos
+        const toggleText = document.createElement('span');
+        toggleText.className = 'toggle-text';
+        toggleText.textContent = 'Ver mais';
+        toggleHeader.appendChild(toggleText);
+        
+        // Criar o conteúdo do toggle
+        const toggleContent = document.createElement('div');
+        toggleContent.className = 'toggle-content';
+        toggleContent.appendChild(gameOptions);
+        
+        // Montar a estrutura
+        optionsToggle.appendChild(toggleHeader);
+        optionsToggle.appendChild(toggleContent);
+        
+        // Inserir o toggle no início do container
+        container.insertBefore(optionsToggle, container.firstChild.nextSibling);
+        
+        // Adicionar evento de toggle
+        toggleHeader.addEventListener('click', () => {
+            optionsToggle.classList.toggle('expanded');
+            // Atualizar texto do botão
+            if (optionsToggle.classList.contains('expanded')) {
+                toggleText.textContent = 'Ver menos';
+            } else {
+                toggleText.textContent = 'Ver mais';
+            }
+        });
     }
 }
 
@@ -417,6 +592,9 @@ function checkSelectedWord() {
                 messageEl.textContent = '';
             }, 2000);
         }
+        
+        // Atualizar contador de palavras encontradas
+        updateFoundCounter();
         
         // Reiniciar a seleção
         selectedCells = [];
